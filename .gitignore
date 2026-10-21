@@ -1,0 +1,9 @@
+build/
+*.o
+*.out
+*.db
+*.db-wal
+*.db-shm
+.vscode/
+.idea/
+.DS_Store
