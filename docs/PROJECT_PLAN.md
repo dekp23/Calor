@@ -2,7 +2,7 @@
 
 ## Overview
 
-Calor is a self-hosted calorie and nutrient tracker built for exact data entry and deep visualization, with no AI estimation. It is a CSC212 project: a C++ engine, a web frontend, and one data structure that was not covered in class.
+Calor is a calorie and nutrient tracker built for exact data entry and deep visualization, with no AI estimation. It is a CSC212 project: a C++ engine, a web frontend, and one data structure that was not covered in class.
 
 - **Name:** Calor, Latin for "heat" and the root of "calorie." In Spanish, Portuguese and Catalan it also means weather heat. Other brands use the name (Calor Gas in the UK, a French appliance maker), so check app stores and domains before publishing anything.
 - **Differentiator:** users log precise, detailed data and explore it through charts, unlike photo-based or AI-estimate trackers (cal.ai style).
