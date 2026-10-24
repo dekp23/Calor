@@ -1,6 +1,6 @@
 # Calor
 
-A self-hosted calorie and nutrient tracker built for exact data entry and deep visualization, with no AI estimation. CSC212 project.
+A calorie and nutrient tracker built for exact data entry and deep visualization, with no AI estimation. CSC212 project.
 
 **Name:** Calor is Latin for "heat" and the root of "calorie." (Name is not final.)
 
