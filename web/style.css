@@ -22,6 +22,12 @@
   --h3: #ee8a3c;
   --h4: #d2502a;
   --h5: #8e1f1f;
+  /* Chart series (validated: lightness, chroma, CVD and contrast checks) */
+  --s-protein: #2c5da8;
+  --s-carbs: #a87812;
+  --s-fat: #a3306f;
+  --bar-context: #b9bfc5;
+  --avg-line: #17202a;
   --narrow: 78%;
   --wide: 125%;
   color-scheme: light;
@@ -37,6 +43,11 @@
     --hair: #333c45;
     --focus: #7aa7ee;
     --protein: #7aa7ee;
+    --s-protein: #5b8fe0;
+    --s-carbs: #b98a2e;
+    --s-fat: #d0609f;
+    --bar-context: #46505a;
+    --avg-line: #e9ece6;
     --error: #f08a7e;
     --h0: #252d35;
     /* On dark paper, more calories = brighter, so the ramp runs dim to bright. */

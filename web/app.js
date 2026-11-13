@@ -374,7 +374,10 @@ function baseOptions(yTitle) {
       x: { ticks: { color: ink, maxRotation: 0, autoSkip: true, maxTicksLimit: 8 }, grid: { display: false } },
       y: { beginAtZero: true, ticks: { color: ink }, grid: { color: grid }, title: { display: true, text: yTitle, color: ink } },
     },
-    plugins: { legend: { labels: { color: ink, boxWidth: 12 } } },
+    plugins: {
+      legend: { labels: { color: ink, boxWidth: 12 } },
+      tooltip: { callbacks: { label: (c) => `${c.dataset.label}: ${fmt(c.parsed.y, 1)} ${yTitle}` } },
+    },
   };
 }
 
@@ -395,15 +398,17 @@ function renderDaily(daily, rolling) {
           type: "bar",
           label: `${labelOf(k)} per day`,
           data: daily.map((d) => (d.stats.logged_days ? d.stats.sum[k] : null)),
-          backgroundColor: cssVar("--h2"),
+          backgroundColor: cssVar("--bar-context"),
+          borderRadius: { topLeft: 3, topRight: 3 },
+          borderSkipped: "bottom",
           order: 2,
         },
         {
           type: "line",
           label: "7-day average",
           data: rolling.map((r) => r.avg),
-          borderColor: cssVar("--h4"),
-          backgroundColor: cssVar("--h4"),
+          borderColor: cssVar("--avg-line"),
+          backgroundColor: cssVar("--avg-line"),
           borderWidth: 2,
           pointRadius: 0,
           spanGaps: true,
@@ -421,14 +426,17 @@ function renderMacros(buckets) {
   const opts = baseOptions("kcal per logged day");
   opts.scales.x.stacked = true;
   opts.scales.y.stacked = true;
+  // 2px surface gap between stacked segments so they read as separate parts.
+  const gap = { borderColor: cssVar("--panel"), borderWidth: { top: 2 }, borderSkipped: "bottom" };
+  opts.plugins.tooltip = { callbacks: { label: (c) => `${c.dataset.label}: ${fmt(c.parsed.y)} kcal` } };
   draw("macro-chart", {
     type: "bar",
     data: {
       labels: buckets.map(label),
       datasets: [
-        { label: "Protein", data: buckets.map((b) => avg(b, "protein_g", 4)), backgroundColor: cssVar("--protein") },
-        { label: "Carbohydrates", data: buckets.map((b) => avg(b, "carbs_g", 4)), backgroundColor: cssVar("--h2") },
-        { label: "Fat", data: buckets.map((b) => avg(b, "fat_g", 9)), backgroundColor: cssVar("--h4") },
+        { label: "Protein", data: buckets.map((b) => avg(b, "protein_g", 4)), backgroundColor: cssVar("--s-protein"), ...gap },
+        { label: "Carbohydrates", data: buckets.map((b) => avg(b, "carbs_g", 4)), backgroundColor: cssVar("--s-carbs"), ...gap },
+        { label: "Fat", data: buckets.map((b) => avg(b, "fat_g", 9)), backgroundColor: cssVar("--s-fat"), ...gap },
       ],
     },
     options: opts,

@@ -85,7 +85,7 @@ inline std::optional<std::int64_t> parseDate(std::string_view s) {
 
 inline std::string formatDate(std::int64_t day) {
     const CivilDate c = civilFromDays(day);
-    char buf[16];
+    char buf[48];
     std::snprintf(buf, sizeof buf, "%04lld-%02u-%02u", static_cast<long long>(c.y), c.m, c.d);
     return buf;
 }
