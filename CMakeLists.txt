@@ -24,7 +24,7 @@ target_link_libraries(test_core PRIVATE calor_core)
 add_test(NAME core COMMAND test_core)
 
 # Engine: SQLite storage + tracker.
-add_library(calor_engine STATIC src/storage.cpp src/tracker.cpp)
+add_library(calor_engine STATIC src/storage.cpp src/tracker.cpp src/usda_import.cpp)
 target_link_libraries(calor_engine PUBLIC calor_core SQLite::SQLite3 Threads::Threads)
 
 add_executable(test_tracker tests/test_tracker.cpp)
@@ -39,3 +39,12 @@ target_link_libraries(calor PRIVATE calor_engine)
 # Benchmark: linear scan vs indexed SQLite vs segment tree.
 add_executable(benchmark bench/benchmark.cpp)
 target_link_libraries(benchmark PRIVATE calor_core SQLite::SQLite3)
+
+# USDA FoodData Central importer.
+add_executable(calor-import-usda src/import_usda.cpp)
+target_link_libraries(calor-import-usda PRIVATE calor_engine)
+
+add_executable(test_usda tests/test_usda.cpp)
+target_link_libraries(test_usda PRIVATE calor_engine)
+target_compile_definitions(test_usda PRIVATE CALOR_FIXTURES="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures")
+add_test(NAME usda COMMAND test_usda)

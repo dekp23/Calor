@@ -21,6 +21,12 @@ struct Food {
     std::string name;
     std::string serving;  // e.g. "100 g", "1 cup"
     Nutrients per_serving = Nutrients(kNumNutrients, 0.0);
+    std::optional<std::int64_t> fdc_id;  // USDA FoodData Central id, if imported
+    std::string source;                  // "" for foods you added, else e.g. "USDA SR Legacy"
+};
+
+struct ImportCounts {
+    std::size_t inserted = 0, updated = 0, name_conflicts = 0;
 };
 
 struct Entry {
@@ -50,6 +56,12 @@ public:
     bool deleteFood(std::int64_t id);
     std::optional<Food> getFood(std::int64_t id) const;
     std::vector<Food> allFoods() const;
+    // Your own foods first, then by name; at most `limit`.
+    std::vector<Food> listFoods(std::size_t limit) const;
+    // Insert or update foods by fdc_id in one transaction. A new food whose
+    // name equals an existing food's (case-insensitive) is skipped and
+    // counted, so imports never overwrite foods you entered.
+    ImportCounts upsertFoods(const std::vector<Food>& foods);
 
     // Entries
     std::int64_t addEntry(const Entry& e);

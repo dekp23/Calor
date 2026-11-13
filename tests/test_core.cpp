@@ -187,6 +187,13 @@ TEST(trie_prefix_and_word_search) {
     CHECK(rice.size() == 2);  // "brown rice" and "rice cake", no duplicates
     CHECK(trie.search("xyz").empty());
     CHECK(trie.search("r", 1).size() == 1);
+    // Multi-word: every query word must prefix a name word, any order.
+    trie.insert("Cheese, cheddar, sharp", 5);
+    CHECK(trie.match("cheddar che") == std::vector<std::int64_t>{5});
+    CHECK(trie.match("breast chi") == std::vector<std::int64_t>{1});
+    CHECK(trie.match("rice brown") == std::vector<std::int64_t>{3});
+    CHECK(trie.match("rice zzz").empty());
+    CHECK(trie.match("  ").empty());
     trie.erase("Chickpeas", 2);
     CHECK(trie.search("chi") == std::vector<std::int64_t>{1});
 }

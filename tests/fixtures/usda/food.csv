@@ -1,0 +1,8 @@
+﻿"fdc_id","data_type","description","food_category_id","publication_date"
+"167959","sr_legacy_food","Snacks, popcorn, air-popped","25","2019-04-01"
+"9000001","foundation_food","Test foundation food, raw","9","2024-04-18"
+"9000002","sub_sample_food","Test sub sample, should not import","","2024-04-18"
+"9000003","sr_legacy_food","Test food with no energy value","","2019-04-01"
+"9000004","survey_fndds_food","Test ""quoted"" food, with comma
+and line break","","2024-10-31"
+"9000005","branded_food","Test branded bar","","2026-10-29"

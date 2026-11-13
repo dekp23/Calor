@@ -180,6 +180,7 @@ function resetForm() {
   state.editingFoodId = null;
   state.pickedFood = null;
   $("log-form").reset();
+  $("servings-label").textContent = "Servings";
   $("servings").value = "1";
   $("form-title").textContent = "Add food";
   $("submit-btn").textContent = "Add to day";
@@ -272,7 +273,8 @@ function setupSearch() {
     state.pickedFood = f;
     input.value = f.name;
     close();
-    message(`${f.name}: ${fmt(f.nutrients.calories)} kcal per ${f.serving || "serving"}.`);
+    $("servings-label").textContent = f.serving ? `Servings (1 = ${f.serving})` : "Servings";
+    message(`${f.name}: ${fmt(f.nutrients.calories)} kcal per ${f.serving || "serving"}${f.source ? ` (${f.source})` : ""}.`);
   };
   const render = () => {
     list.replaceChildren();
@@ -280,15 +282,16 @@ function setupSearch() {
       const li = document.createElement("li");
       li.setAttribute("role", "option");
       li.setAttribute("aria-selected", i === active ? "true" : "false");
-      li.innerHTML = `<span></span><small></small>`;
-      li.firstChild.textContent = f.name;
-      li.lastChild.textContent = `${fmt(f.nutrients.calories)} kcal / ${f.serving || "serving"}`;
+      li.innerHTML = `<span class="food-name"><span></span><small></small></span><small class="food-kcal"></small>`;
+      li.querySelector(".food-name span").textContent = f.name;
+      li.querySelector(".food-name small").textContent = f.source || "Your food";
+      li.querySelector(".food-kcal").textContent = `${fmt(f.nutrients.calories)} kcal per ${f.serving || "serving"}`;
       li.addEventListener("mousedown", (e) => { e.preventDefault(); pick(f); });
       list.append(li);
     });
     if (!results.length) {
       const li = document.createElement("li");
-      li.textContent = "No saved food matches. Enter values by hand below.";
+      li.textContent = "No food matches. Try fewer letters, or enter values by hand below.";
       list.append(li);
     }
     list.hidden = false;
@@ -297,6 +300,7 @@ function setupSearch() {
 
   input.addEventListener("input", () => {
     state.pickedFood = null;
+    $("servings-label").textContent = "Servings";
     clearTimeout(timer);
     const q = input.value.trim();
     if (!q) return close();

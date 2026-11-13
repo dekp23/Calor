@@ -65,6 +65,7 @@ std::string jnutrients(const Nutrients& n) {
 
 std::string jfood(const Food& f) {
     return "{\"id\":" + std::to_string(f.id) + ",\"name\":" + jstr(f.name) + ",\"serving\":" + jstr(f.serving) +
+           ",\"fdc_id\":" + (f.fdc_id ? std::to_string(*f.fdc_id) : "null") + ",\"source\":" + jstr(f.source) +
            ",\"nutrients\":" + jnutrients(f.per_serving) + "}";
 }
 
@@ -260,8 +261,7 @@ int main(int argc, char** argv) {
     svr.Get("/api/foods", [&](const httplib::Request& req, httplib::Response& res) {
         const std::string q = param(req, "q");
         const auto limit = static_cast<std::size_t>(std::clamp(toNumber(param(req, "limit", "20"), "limit"), 1.0, 500.0));
-        auto foods = q.empty() ? tracker.allFoods() : tracker.searchFoods(q, limit);
-        if (foods.size() > limit) foods.resize(limit);
+        const auto foods = q.empty() ? tracker.listFoods(limit) : tracker.searchFoods(q, limit);
         sendJson(res, jarray(foods, jfood));
     });
 

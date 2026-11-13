@@ -42,12 +42,12 @@
         <form id="log-form" class="log" autocomplete="off">
           <h3 id="form-title">Add food</h3>
           <div class="field search">
-            <label for="food-search">Saved food</label>
-            <input id="food-search" type="search" placeholder="Start typing, e.g. oat" aria-autocomplete="list" aria-controls="food-results">
+            <label for="food-search">Food</label>
+            <input id="food-search" type="search" placeholder="Type any words, e.g. cheddar sharp" aria-autocomplete="list" aria-controls="food-results">
             <ul id="food-results" role="listbox" hidden></ul>
           </div>
           <div class="row">
-            <div class="field"><label for="servings">Servings</label><input id="servings" type="number" min="0.01" step="0.01" value="1" required></div>
+            <div class="field"><label for="servings" id="servings-label">Servings</label><input id="servings" type="number" min="0.01" step="0.01" value="1" required></div>
             <div class="field"><label for="meal">Meal</label>
               <select id="meal"><option>breakfast</option><option>lunch</option><option>dinner</option><option>snack</option></select>
             </div>

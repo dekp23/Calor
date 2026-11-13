@@ -1,6 +1,7 @@
 #include <calor/tracker.hpp>
 
 #include <algorithm>
+#include <cctype>
 #include <chrono>
 #include <limits>
 #include <stdexcept>
@@ -82,9 +83,17 @@ void Tracker::refreshDay(std::int64_t day) {
     else tree_.clear(i);
 }
 
+void Tracker::indexFood(const Food& f) {
+    trie_.insert(f.name, f.id);
+    std::string low = f.name;
+    for (char& c : low) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    keys_[f.id] = {std::move(low), !f.fdc_id};
+}
+
 void Tracker::rebuildTrie() {
     trie_.clear();
-    for (const Food& f : db_.allFoods()) trie_.insert(f.name, f.id);
+    keys_.clear();
+    for (const Food& f : db_.allFoods()) indexFood(f);
 }
 
 // ---- Foods ----
@@ -93,7 +102,7 @@ Food Tracker::addFood(Food f) {
     validate(f);
     std::lock_guard<std::mutex> lock(mu_);
     f.id = db_.addFood(f);
-    trie_.insert(f.name, f.id);
+    indexFood(f);
     return f;
 }
 
@@ -103,8 +112,9 @@ std::optional<Food> Tracker::updateFood(const Food& f) {
     const auto old = db_.getFood(f.id);
     if (!old || !db_.updateFood(f)) return std::nullopt;
     trie_.erase(old->name, f.id);
-    trie_.insert(f.name, f.id);
-    return f;
+    Food stored = *db_.getFood(f.id);  // keeps fdc_id/source
+    indexFood(stored);
+    return stored;
 }
 
 bool Tracker::deleteFood(std::int64_t id) {
@@ -112,6 +122,7 @@ bool Tracker::deleteFood(std::int64_t id) {
     const auto old = db_.getFood(id);
     if (!old || !db_.deleteFood(id)) return false;  // entries keep their own copy
     trie_.erase(old->name, id);
+    keys_.erase(id);
     return true;
 }
 
@@ -120,12 +131,50 @@ std::optional<Food> Tracker::getFood(std::int64_t id) {
     return db_.getFood(id);
 }
 
-std::vector<Food> Tracker::searchFoods(const std::string& prefix, std::size_t limit) {
+std::vector<Food> Tracker::searchFoods(const std::string& query, std::size_t limit) {
     std::lock_guard<std::mutex> lock(mu_);
+    std::vector<std::int64_t> ids = trie_.match(query);
+    const auto words = FoodTrie::words(query);
+    const std::string first = words.empty() ? "" : words.front();
+    struct Ranked {
+        bool user, starts;
+        std::size_t len;
+        const std::string* name;
+        std::int64_t id;
+    };
+    std::vector<Ranked> ranked;
+    ranked.reserve(ids.size());
+    for (std::int64_t id : ids) {
+        auto it = keys_.find(id);
+        if (it == keys_.end()) continue;
+        const std::string& n = it->second.lower;
+        ranked.push_back({it->second.user, n.compare(0, first.size(), first) == 0, n.size(), &n, id});
+    }
+    const std::size_t k = std::min(limit, ranked.size());
+    std::partial_sort(ranked.begin(), ranked.begin() + static_cast<long>(k), ranked.end(),
+                      [](const Ranked& a, const Ranked& b) {
+                          if (a.user != b.user) return a.user;
+                          if (a.starts != b.starts) return a.starts;
+                          if (a.len != b.len) return a.len < b.len;
+                          return *a.name < *b.name;
+                      });
     std::vector<Food> out;
-    for (std::int64_t id : trie_.search(prefix, limit))
-        if (auto f = db_.getFood(id)) out.push_back(std::move(*f));
+    for (std::size_t i = 0; i < k; ++i)
+        if (auto f = db_.getFood(ranked[i].id)) out.push_back(std::move(*f));
     return out;
+}
+
+ImportCounts Tracker::importFoods(const std::vector<Food>& foods) {
+    for (const Food& f : foods) validate(f);
+    std::lock_guard<std::mutex> lock(mu_);
+    const ImportCounts c = db_.upsertFoods(foods);
+    rebuildTrie();
+    return c;
+}
+
+std::vector<Food> Tracker::listFoods(std::size_t limit) {
+    std::lock_guard<std::mutex> lock(mu_);
+    return db_.listFoods(limit);
 }
 
 std::vector<Food> Tracker::allFoods() {

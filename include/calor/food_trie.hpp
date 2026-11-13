@@ -1,17 +1,26 @@
 // Calor: trie for food-name search.
 //
-// Every word start in a food name is inserted, so "chi" finds
-// "Chicken breast" and "bre" finds it too. Matching is case-insensitive.
-// Lookup walks the prefix in O(p) for a prefix of length p, then collects
-// up to `limit` ids from that subtree in alphabetical order.
+// Each word of a food name (a run of letters and digits, lowercased) is a
+// key. A query is split into words the same way, and a food matches when
+// every query word is a prefix of some word in its name, in any order. So
+// "cheddar che" finds "Cheese, cheddar, sharp".
+//
+// Costs, for a query word of length p:
+//   insert     O(total name length)
+//   prefix     O(p) to reach the node, then O(results) to collect ids
+//   match      one prefix lookup per query word, then a set intersection
+// Indexing words (not every suffix) keeps the trie small: its size grows
+// with the vocabulary, which stays in the tens of thousands of words even
+// for the full USDA SR Legacy set.
 #pragma once
 
+#include <algorithm>
 #include <cctype>
 #include <cstdint>
-#include <map>
 #include <string>
 #include <string_view>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
 namespace calor {
@@ -26,52 +35,78 @@ public:
         size_ = 0;
     }
 
-    // Index `name` under `id`. Each word start becomes a searchable key.
-    void insert(std::string_view name, std::int64_t id) {
-        const std::string low = lower(name);
-        for (std::size_t i = 0; i < low.size(); ++i) {
-            const bool wordStart = i == 0 || !std::isalnum(static_cast<unsigned char>(low[i - 1]));
-            if (wordStart && std::isalnum(static_cast<unsigned char>(low[i])))
-                insertKey(std::string_view(low).substr(i), id);
+    // Lowercased alphanumeric words of `s`.
+    static std::vector<std::string> words(std::string_view s) {
+        std::vector<std::string> out;
+        std::string cur;
+        for (char ch : s) {
+            const auto c = static_cast<unsigned char>(ch);
+            if (std::isalnum(c)) {
+                cur += static_cast<char>(std::tolower(c));
+            } else if (!cur.empty()) {
+                out.push_back(std::move(cur));
+                cur.clear();
+            }
         }
+        if (!cur.empty()) out.push_back(std::move(cur));
+        return out;
+    }
+
+    void insert(std::string_view name, std::int64_t id) {
+        auto ws = words(name);
+        std::sort(ws.begin(), ws.end());
+        ws.erase(std::unique(ws.begin(), ws.end()), ws.end());
+        for (const auto& w : ws) nodes_[walk(w, true)].ids.push_back(id);
         ++size_;
     }
 
-    // Remove `name`'s keys for `id` (used when a food is renamed or deleted).
     void erase(std::string_view name, std::int64_t id) {
-        const std::string low = lower(name);
-        for (std::size_t i = 0; i < low.size(); ++i) {
-            const bool wordStart = i == 0 || !std::isalnum(static_cast<unsigned char>(low[i - 1]));
-            if (!wordStart || !std::isalnum(static_cast<unsigned char>(low[i]))) continue;
-            int cur = 0;
-            bool found = true;
-            for (char c : std::string_view(low).substr(i)) {
-                auto it = nodes_[cur].next.find(c);
-                if (it == nodes_[cur].next.end()) { found = false; break; }
-                cur = it->second;
-            }
-            if (!found) continue;
-            auto& ids = nodes_[cur].ids;
-            for (auto it = ids.begin(); it != ids.end(); ++it)
-                if (*it == id) { ids.erase(it); break; }
+        for (const auto& w : words(name)) {
+            const int n = walk(w, false);
+            if (n < 0) continue;
+            auto& ids = nodes_[n].ids;
+            ids.erase(std::remove(ids.begin(), ids.end(), id), ids.end());
         }
         if (size_ > 0) --size_;
     }
 
-    // Ids whose name has a word starting with `prefix`, at most `limit`,
-    // without duplicates, in alphabetical order of the matched key.
+    // Ids with a word starting with `prefix` (one word), at most `limit`,
+    // no duplicates, in alphabetical order of the matched word.
     std::vector<std::int64_t> search(std::string_view prefix, std::size_t limit = 10) const {
         std::vector<std::int64_t> out;
-        if (limit == 0) return out;
-        int cur = 0;
-        for (char c : lower(prefix)) {
-            auto it = nodes_[cur].next.find(c);
-            if (it == nodes_[cur].next.end()) return out;
-            cur = it->second;
-        }
+        const auto ws = words(prefix);
+        if (ws.empty() || limit == 0) return out;
+        const int start = walk(ws.front(), false);
+        if (start < 0) return out;
         std::unordered_set<std::int64_t> seen;
-        collect(cur, limit, out, seen);
+        collect(start, limit, out, seen);
         return out;
+    }
+
+    // Ids matching every word of `query` as a prefix. At most `cap` ids are
+    // gathered per query word, which bounds the work for one-letter words.
+    std::vector<std::int64_t> match(std::string_view query, std::size_t cap = 50000) const {
+        const auto ws = words(query);
+        if (ws.empty()) return {};
+        std::vector<std::vector<std::int64_t>> sets;
+        for (const auto& w : ws) {
+            std::vector<std::int64_t> ids;
+            const int n = walk(w, false);
+            if (n < 0) return {};  // a word nothing starts with: no match
+            std::unordered_set<std::int64_t> seen;
+            collect(n, cap, ids, seen);
+            std::sort(ids.begin(), ids.end());
+            sets.push_back(std::move(ids));
+        }
+        // Intersect, smallest set first.
+        std::sort(sets.begin(), sets.end(), [](const auto& a, const auto& b) { return a.size() < b.size(); });
+        std::vector<std::int64_t> acc = std::move(sets.front());
+        for (std::size_t i = 1; i < sets.size() && !acc.empty(); ++i) {
+            std::vector<std::int64_t> next;
+            std::set_intersection(acc.begin(), acc.end(), sets[i].begin(), sets[i].end(), std::back_inserter(next));
+            acc = std::move(next);
+        }
+        return acc;
     }
 
     std::size_t size() const { return size_; }
@@ -79,43 +114,57 @@ public:
 
 private:
     struct Node {
-        std::map<char, int> next;       // ordered, so results come out alphabetically
-        std::vector<std::int64_t> ids;  // foods whose key ends here
+        std::vector<std::pair<char, int>> next;  // sorted by char
+        std::vector<std::int64_t> ids;           // foods with this exact word
     };
     std::vector<Node> nodes_;
     std::size_t size_ = 0;
 
-    static std::string lower(std::string_view s) {
-        std::string out(s);
-        for (char& c : out) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-        return out;
-    }
-
-    void insertKey(std::string_view key, std::int64_t id) {
+    // Follow `key` from the root; create nodes if `create`, else -1 when absent.
+    int walk(const std::string& key, bool create) {
         int cur = 0;
         for (char c : key) {
-            auto it = nodes_[cur].next.find(c);
-            if (it == nodes_[cur].next.end()) {
-                const int fresh = static_cast<int>(nodes_.size());
-                nodes_.emplace_back();  // may reallocate: index, don't hold refs
-                nodes_[cur].next.emplace(c, fresh);
-                cur = fresh;
-            } else {
+            auto& nx = nodes_[cur].next;
+            auto it = std::lower_bound(nx.begin(), nx.end(), c,
+                                       [](const std::pair<char, int>& p, char ch) { return p.first < ch; });
+            if (it != nx.end() && it->first == c) {
                 cur = it->second;
+            } else {
+                if (!create) return -1;
+                const int fresh = static_cast<int>(nodes_.size());
+                nx.insert(it, {c, fresh});
+                nodes_.emplace_back();  // may reallocate: hold indices, not references
+                cur = fresh;
             }
         }
-        nodes_[cur].ids.push_back(id);
+        return cur;
+    }
+    int walk(const std::string& key, bool create) const {
+        (void)create;
+        int cur = 0;
+        for (char c : key) {
+            const auto& nx = nodes_[cur].next;
+            auto it = std::lower_bound(nx.begin(), nx.end(), c,
+                                       [](const std::pair<char, int>& p, char ch) { return p.first < ch; });
+            if (it == nx.end() || it->first != c) return -1;
+            cur = it->second;
+        }
+        return cur;
     }
 
     void collect(int node, std::size_t limit, std::vector<std::int64_t>& out,
                  std::unordered_set<std::int64_t>& seen) const {
-        for (std::int64_t id : nodes_[node].ids) {
-            if (out.size() >= limit) return;
-            if (seen.insert(id).second) out.push_back(id);
-        }
-        for (const auto& [c, child] : nodes_[node].next) {
-            if (out.size() >= limit) return;
-            collect(child, limit, out, seen);
+        // Iterative DFS in alphabetical order (no deep recursion on long words).
+        std::vector<int> stack{node};
+        while (!stack.empty() && out.size() < limit) {
+            const int n = stack.back();
+            stack.pop_back();
+            for (std::int64_t id : nodes_[n].ids) {
+                if (out.size() >= limit) return;
+                if (seen.insert(id).second) out.push_back(id);
+            }
+            const auto& nx = nodes_[n].next;
+            for (auto it = nx.rbegin(); it != nx.rend(); ++it) stack.push_back(it->second);
         }
     }
 };

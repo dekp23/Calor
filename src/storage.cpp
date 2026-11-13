@@ -76,7 +76,7 @@ void checkDims(const Nutrients& n) {
     if (n.size() != kNumNutrients) throw std::invalid_argument("nutrient vector has wrong length");
 }
 
-const std::string kFoodCols = "id, name, serving, " + nutrientCols();
+const std::string kFoodCols = "id, name, serving, fdc_id, source, " + nutrientCols();
 const std::string kEntryCols = "id, day, food_id, servings, name, meal, notes, " + nutrientCols();
 
 Food readFood(const Stmt& st) {
@@ -84,7 +84,9 @@ Food readFood(const Stmt& st) {
     f.id = st.i64(0);
     f.name = st.text(1);
     f.serving = st.text(2);
-    for (std::size_t j = 0; j < kNumNutrients; ++j) f.per_serving[j] = st.dbl(3 + static_cast<int>(j));
+    if (!st.isNull(3)) f.fdc_id = st.i64(3);
+    f.source = st.text(4);
+    for (std::size_t j = 0; j < kNumNutrients; ++j) f.per_serving[j] = st.dbl(5 + static_cast<int>(j));
     return f;
 }
 
@@ -156,6 +158,17 @@ void Storage::migrate() {
          " created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)");
     exec("CREATE INDEX IF NOT EXISTS idx_entries_day ON entries(day)");
 
+    // Columns added after the first release; ALTER on older databases.
+    auto addColumn = [&](const char* table, const char* col, const char* type) {
+        Stmt info(db_, std::string("PRAGMA table_info(") + table + ")");
+        while (info.step())
+            if (info.text(1) == col) return;
+        exec(std::string("ALTER TABLE ") + table + " ADD COLUMN " + col + " " + type);
+    };
+    addColumn("foods", "fdc_id", "INTEGER");
+    addColumn("foods", "source", "TEXT NOT NULL DEFAULT ''");
+    exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_foods_fdc ON foods(fdc_id) WHERE fdc_id IS NOT NULL");
+
     // Add any nutrient column that is missing, so appending to kNutrients
     // upgrades existing databases in place.
     for (const char* table : {"foods", "entries"}) {
@@ -172,14 +185,61 @@ void Storage::migrate() {
 
 std::int64_t Storage::addFood(const Food& f) {
     checkDims(f.per_serving);
-    Stmt st(db_, "INSERT INTO foods (name, serving, " + nutrientCols() + ") VALUES (?, ?, " +
+    Stmt st(db_, "INSERT INTO foods (name, serving, fdc_id, source, " + nutrientCols() + ") VALUES (?, ?, ?, ?, " +
                      placeholders(kNumNutrients) + ")");
     int i = 1;
     st.bind(i++, f.name);
     st.bind(i++, f.serving);
+    if (f.fdc_id) st.bind(i++, *f.fdc_id); else st.bindNull(i++);
+    st.bind(i++, f.source);
     for (double v : f.per_serving) st.bind(i++, v);
     st.run();
     return sqlite3_last_insert_rowid(db_);
+}
+
+ImportCounts Storage::upsertFoods(const std::vector<Food>& foods) {
+    ImportCounts c;
+    exec("BEGIN");
+    try {
+        Stmt upd(db_, "UPDATE foods SET name = ?, serving = ?, source = ?, " + nutrientCols("", " = ?") +
+                          " WHERE fdc_id = ?");
+        Stmt ins(db_, "INSERT OR IGNORE INTO foods (name, serving, fdc_id, source, " + nutrientCols() +
+                          ") VALUES (?, ?, ?, ?, " + placeholders(kNumNutrients) + ")");
+        for (const Food& f : foods) {
+            checkDims(f.per_serving);
+            if (!f.fdc_id) throw std::invalid_argument("upsertFoods needs fdc_id");
+            upd.reset();
+            int i = 1;
+            upd.bind(i++, f.name);
+            upd.bind(i++, f.serving);
+            upd.bind(i++, f.source);
+            for (double v : f.per_serving) upd.bind(i++, v);
+            upd.bind(i, *f.fdc_id);
+            try {
+                upd.run();
+            } catch (const std::runtime_error&) {
+                // Renamed upstream to a name another food already has: keep ours.
+                ++c.name_conflicts;
+                continue;
+            }
+            if (sqlite3_changes(db_) > 0) { ++c.updated; continue; }
+            ins.reset();
+            i = 1;
+            ins.bind(i++, f.name);
+            ins.bind(i++, f.serving);
+            ins.bind(i++, *f.fdc_id);
+            ins.bind(i++, f.source);
+            for (double v : f.per_serving) ins.bind(i++, v);
+            ins.run();
+            if (sqlite3_changes(db_) > 0) ++c.inserted;
+            else ++c.name_conflicts;
+        }
+        exec("COMMIT");
+    } catch (...) {
+        exec("ROLLBACK");
+        throw;
+    }
+    return c;
 }
 
 bool Storage::updateFood(const Food& f) {
@@ -203,6 +263,14 @@ std::optional<Food> Storage::getFood(std::int64_t id) const {
     st.bind(1, id);
     if (!st.step()) return std::nullopt;
     return readFood(st);
+}
+
+std::vector<Food> Storage::listFoods(std::size_t limit) const {
+    Stmt st(db_, "SELECT " + kFoodCols + " FROM foods ORDER BY fdc_id IS NOT NULL, name LIMIT ?");
+    st.bind(1, static_cast<std::int64_t>(limit));
+    std::vector<Food> out;
+    while (st.step()) out.push_back(readFood(st));
+    return out;
 }
 
 std::vector<Food> Storage::allFoods() const {

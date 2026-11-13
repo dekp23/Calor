@@ -13,6 +13,7 @@
 #include <mutex>
 #include <optional>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace calor {
@@ -40,8 +41,13 @@ public:
     std::optional<Food> updateFood(const Food& f);
     bool deleteFood(std::int64_t id);
     std::optional<Food> getFood(std::int64_t id);
-    std::vector<Food> searchFoods(const std::string& prefix, std::size_t limit);
+    // Every query word must prefix a word of the name. Ranked: your own
+    // foods first, then names starting with the first query word, then
+    // shorter names.
+    std::vector<Food> searchFoods(const std::string& query, std::size_t limit);
+    ImportCounts importFoods(const std::vector<Food>& foods);  // bulk upsert by fdc_id
     std::vector<Food> allFoods();
+    std::vector<Food> listFoods(std::size_t limit);
 
     // Entries
     Entry addEntry(Entry e);  // e.nutrients are totals for the entry
@@ -74,6 +80,12 @@ private:
     Storage db_;
     SegmentTree tree_;
     FoodTrie trie_;
+    struct FoodKey {
+        std::string lower;  // lowercased name, for ranking
+        bool user;          // added by the user (not imported)
+    };
+    std::unordered_map<std::int64_t, FoodKey> keys_;
+    void indexFood(const Food& f);
     std::int64_t base_ = 0;  // day number of tree leaf 0
 
     void rebuildLocked(std::int64_t lo, std::int64_t hi);
