@@ -35,3 +35,7 @@ add_test(NAME tracker COMMAND test_tracker)
 add_executable(calor src/main.cpp)
 target_include_directories(calor PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/third_party)
 target_link_libraries(calor PRIVATE calor_engine)
+
+# Benchmark: linear scan vs indexed SQLite vs segment tree.
+add_executable(benchmark bench/benchmark.cpp)
+target_link_libraries(benchmark PRIVATE calor_core SQLite::SQLite3)

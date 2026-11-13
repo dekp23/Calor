@@ -1,0 +1,25 @@
+# systemd unit for Calor on a Raspberry Pi.
+#
+# Edit User and the two paths below to match where the repo and database
+# live (keep the database on the SSD), then:
+#   sudo cp deploy/calor.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now calor
+#   journalctl -u calor -f      # logs
+[Unit]
+Description=Calor calorie tracker
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=pi
+WorkingDirectory=/mnt/ssd/calor
+ExecStart=/mnt/ssd/calor/build-release/calor --db /mnt/ssd/calor-data/calor.db --web /mnt/ssd/calor/web --port 8080
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+ProtectSystem=full
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

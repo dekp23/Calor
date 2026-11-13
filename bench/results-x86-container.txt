@@ -1,0 +1,84 @@
+days      shape     method         per op      ops
+n=1000  tree build 0.3 ms, 0.4 MB; SQLite load 1.5 ms
+1000      random    linear         677 ns     2000
+1000      random    sqlite       228.8 us     2000
+1000      random    segtree        271 ns     2000
+1000      window30  linear          57 ns     2000
+1000      window30  sqlite        20.7 us     2000
+1000      window30  segtree        176 ns     2000
+1000      update    sqlite         1.2 us     2000
+1000      update    segtree        143 ns     2000
+
+n=10000  tree build 4.1 ms, 6.9 MB; SQLite load 5.5 ms
+10000     random    linear         6.6 us     2000
+10000     random    sqlite        2.02 ms      304
+10000     random    segtree        694 ns     2000
+10000     window30  linear          85 ns     2000
+10000     window30  sqlite        22.5 us     2000
+10000     window30  segtree        253 ns     2000
+10000     update    sqlite         1.4 us     2000
+10000     update    segtree        337 ns     2000
+
+n=100000  tree build 41.3 ms, 55.0 MB; SQLite load 78.7 ms
+100000    random    linear        94.0 us     2000
+100000    random    sqlite       18.69 ms       48
+100000    random    segtree        804 ns     2000
+100000    window30  linear         131 ns     2000
+100000    window30  sqlite        22.9 us     2000
+100000    window30  segtree        393 ns     2000
+100000    update    sqlite         1.6 us     2000
+100000    update    segtree        594 ns     2000
+
+n=1000000  tree build 421.0 ms, 440.0 MB; SQLite load 660.6 ms
+1000000   random    linear        1.97 ms      320
+1000000   random    sqlite      220.66 ms       16
+1000000   random    segtree        1.4 us     2000
+1000000   window30  linear         209 ns     2000
+1000000   window30  sqlite        24.7 us     2000
+1000000   window30  segtree        623 ns     2000
+1000000   update    sqlite         2.4 us     2000
+1000000   update    segtree        1.0 us     2000
+
+Range-length sweep, 100000 days
+100000    len1      linear          65 ns     2000
+100000    len1      sqlite         5.1 us     2000
+100000    len1      segtree        173 ns     2000
+100000    len7      linear          20 ns     2000
+100000    len7      sqlite         6.3 us     2000
+100000    len7      segtree        311 ns     2000
+100000    len14     linear          53 ns     2000
+100000    len14     sqlite        11.1 us     2000
+100000    len14     segtree        523 ns     2000
+100000    len30     linear         271 ns     2000
+100000    len30     sqlite        29.2 us     2000
+100000    len30     segtree        614 ns     2000
+100000    len60     linear         278 ns     2000
+100000    len60     sqlite        41.6 us     2000
+100000    len60     segtree        500 ns     2000
+100000    len90     linear         338 ns     2000
+100000    len90     sqlite        58.0 us     2000
+100000    len90     segtree        539 ns     2000
+100000    len180    linear         662 ns     2000
+100000    len180    sqlite       115.2 us     2000
+100000    len180    segtree        596 ns     2000
+100000    len365    linear         1.2 us     2000
+100000    len365    sqlite       242.4 us     2000
+100000    len365    segtree        690 ns     2000
+100000    len730    linear         2.3 us     2000
+100000    len730    sqlite       463.8 us     1296
+100000    len730    segtree        649 ns     2000
+100000    len1825   linear         5.8 us     2000
+100000    len1825   sqlite        1.16 ms      528
+100000    len1825   segtree        712 ns     2000
+100000    len3650   linear        11.6 us     2000
+100000    len3650   sqlite        2.36 ms      256
+100000    len3650   segtree        754 ns     2000
+100000    len10000  linear        32.4 us     2000
+100000    len10000  sqlite        6.54 ms       96
+100000    len10000  segtree        831 ns     2000
+100000    len36500  linear       116.0 us     2000
+100000    len36500  sqlite       24.42 ms       32
+100000    len36500  segtree        903 ns     2000
+
+Correctness: 0 mismatches against the linear scan.
+Wrote bench/results-x86-container.csv
