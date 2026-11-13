@@ -22,3 +22,11 @@ enable_testing()
 add_executable(test_core tests/test_core.cpp)
 target_link_libraries(test_core PRIVATE calor_core)
 add_test(NAME core COMMAND test_core)
+
+# Engine: SQLite storage + tracker.
+add_library(calor_engine STATIC src/storage.cpp src/tracker.cpp)
+target_link_libraries(calor_engine PUBLIC calor_core SQLite::SQLite3 Threads::Threads)
+
+add_executable(test_tracker tests/test_tracker.cpp)
+target_link_libraries(test_tracker PRIVATE calor_engine)
+add_test(NAME tracker COMMAND test_tracker)
