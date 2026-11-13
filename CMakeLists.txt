@@ -30,3 +30,8 @@ target_link_libraries(calor_engine PUBLIC calor_core SQLite::SQLite3 Threads::Th
 add_executable(test_tracker tests/test_tracker.cpp)
 target_link_libraries(test_tracker PRIVATE calor_engine)
 add_test(NAME tracker COMMAND test_tracker)
+
+# HTTP server (cpp-httplib, vendored single header, MIT).
+add_executable(calor src/main.cpp)
+target_include_directories(calor PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/third_party)
+target_link_libraries(calor PRIVATE calor_engine)
